@@ -18,3 +18,4 @@ Versions stay on `0.x` while this is a proof of concept:
 - Added: Saving in the browser, with JSON export and import.
 - Added: Light, Dark and Programmer themes.
 - Added: Installs to a phone's home screen and works offline.
+- Fixed: The phone's status bar and bottom bar area now follow the app's theme instead of staying white.

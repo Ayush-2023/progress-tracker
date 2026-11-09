@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Progress Tracker</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
@@ -10,16 +10,19 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Progress">
-  <meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#191a18" media="(prefers-color-scheme: dark)">
+  <!-- Colours the phone's status bar. Kept in step with the app's theme by the script below and app.js. -->
+  <meta name="theme-color" content="#f6f5f1">
   <script>
     // Runs before the page paints, so a saved theme never flashes the wrong colors.
+    // The colours here must match THEME_BAR_COLORS in app.js.
     (function () {
+      var barColors = { light: "#f6f5f1", dark: "#191a18", programmer: "#000000" };
       var saved = null;
       try { saved = localStorage.getItem("progress-tracker.theme"); } catch (error) {}
       var system = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      document.documentElement.dataset.theme =
-        ["light", "dark", "programmer"].indexOf(saved) !== -1 ? saved : system;
+      var theme = barColors.hasOwnProperty(saved) ? saved : system;
+      document.documentElement.dataset.theme = theme;
+      document.querySelector('meta[name="theme-color"]').content = barColors[theme];
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">

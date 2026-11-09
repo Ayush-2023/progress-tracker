@@ -10,6 +10,8 @@ const TAB_ITEMS = { goals: "goal", achievements: "achievement", reminders: "remi
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const THEME_KEY = "progress-tracker.theme";
 const THEMES = { light: "Light", dark: "Dark", programmer: "Programmer" };
+// Each theme's background, used for the phone's status bar. Must match the script in index.html.
+const THEME_BAR_COLORS = { light: "#f6f5f1", dark: "#191a18", programmer: "#000000" };
 
 // Which kinds of item can sit directly under each kind.
 const CHILD_KINDS = {
@@ -761,9 +763,15 @@ function systemTheme() {
   return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const bar = document.querySelector('meta[name="theme-color"]');
+  if (bar) bar.content = THEME_BAR_COLORS[theme];
+}
+
 // The theme is a preference of this browser, so it isn't part of exported data.
 function chooseTheme(theme) {
-  document.documentElement.dataset.theme = theme;
+  applyTheme(theme);
   try {
     localStorage.setItem(THEME_KEY, theme);
   } catch (error) { /* The theme still applies until the page closes. */ }
@@ -954,7 +962,7 @@ window.addEventListener("storage", (event) => {
     render();
   }
   if (event.key === THEME_KEY) {
-    document.documentElement.dataset.theme = storedTheme() || systemTheme();
+    applyTheme(storedTheme() || systemTheme());
     render();
   }
 });
@@ -987,7 +995,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 // With no theme chosen yet, keep following the system's light or dark setting.
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
   if (!storedTheme()) {
-    document.documentElement.dataset.theme = systemTheme();
+    applyTheme(systemTheme());
     render();
   }
 });
