@@ -12,8 +12,18 @@ Raw dump. Newest on top. Write the idea first; add relations later at the weekly
 - Generalizes: [[I-000]]   broader version of a narrower idea
 - Related: [[I-000]]       connected, neither contains the other
 - Conflicts: [[I-000]]     can't both be true
+- Supersedes: [[I-000]]    replaces an older idea after a change of direction
 - Motto: 1 or 2
+- Release: v0.0.0          the release that will ship or shipped this idea
 ```
+
+## Status values
+
+- `open`: not decided yet
+- `accepted`: will be built, and has a `Release`
+- `built`: shipped in that release
+- `rejected`: decided against, with a one-line reason
+- `superseded`: replaced by a newer idea
 
 ---
 

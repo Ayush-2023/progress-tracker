@@ -1,0 +1,5 @@
+.DS_Store
+.obsidian/workspace*.json
+
+# Exported data backups contain personal data
+progress-tracker-*.json
