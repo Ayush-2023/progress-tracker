@@ -62,6 +62,9 @@
 
 body {
   margin: 0;
+  /* The page runs behind the phone's system bars (viewport-fit=cover), so its
+     background fills them. This padding keeps the content itself clear of them. */
+  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
   background: var(--bg);
   color: var(--text);
   font: 16px/1.45 var(--font);
