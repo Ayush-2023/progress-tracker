@@ -32,6 +32,11 @@ Personal tool for goals, achievements and reminders. Currently a proof of concep
 - Link ideas with `[[I-001]]` style wikilinks, using the relation fields described at the top of `inbox.md`.
 - Sort the inbox only when the user asks, and confirm where each item goes before moving it.
 
+## Git and publishing
+
+- `main` is protected by a GitHub ruleset: changes reach it only through a pull request (no approval needed), and it can't be force-pushed or deleted. Work on a branch and open a PR.
+- Merging to `main` publishes `app/` to GitHub Pages at https://ayush-2023.github.io/progress-tracker/.
+
 ## Versioning
 
 - Never version ideas with labels like "I-002 v2" or copies like `inbox-v2.md`. Git holds the history.
