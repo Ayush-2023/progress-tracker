@@ -15,6 +15,7 @@ Personal tool for goals, achievements and reminders. Currently a proof of concep
 
 - Goals (long term) hold blockers, tasks and subtasks.
 - Each goal has a permanent visible ID (`G-001`). A deleted goal's number is never reused.
+- Maintenance goals repeat (daily, weekly, fortnightly, monthly, quarterly or yearly) and are tracked by streaks. A check-in marks the current calendar period done, and missing a whole period breaks the streak. Weeks start on Monday.
 - Any goal type can be finished from its dropdown. Finished goals can be reopened or archived, and archived goals can be unarchived.
 - Achievements (short term) can attach to a goal, blocker, task or subtask.
 - Goal types: Targeted (reach an end state), Maintenance (keep something steady), Growth (continuous improvement). Saved data stores these as `Achieve`, `Maintain` and `Grow`, and only the displayed names differ.

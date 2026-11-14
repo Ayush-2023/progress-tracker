@@ -22,6 +22,17 @@ const CHILD_KINDS = {
 };
 const KIND_LABELS = { goal: "Goal", blocker: "Blocker", task: "Task", subtask: "Subtask" };
 
+// How often a Maintenance goal repeats. `period` finishes "Done ..." and `unit` names one period.
+const FREQUENCIES = {
+  daily: { label: "Daily", unit: "day", period: "today" },
+  weekly: { label: "Weekly", unit: "week", period: "this week" },
+  fortnightly: { label: "Fortnightly", unit: "fortnight", period: "this fortnight" },
+  monthly: { label: "Monthly", unit: "month", period: "this month" },
+  quarterly: { label: "Quarterly", unit: "quarter", period: "this quarter" },
+  yearly: { label: "Yearly", unit: "year", period: "this year" },
+};
+const DEFAULT_FREQUENCY = "weekly";
+
 /* ---------- Data ---------- */
 
 function emptyData() {
@@ -42,6 +53,66 @@ function ensureGoalNumbers(loaded) {
 
 function goalId(goal) {
   return `G-${String(goal.goalNumber).padStart(3, "0")}`;
+}
+
+// Fills in anything older saved data or backups are missing.
+function upgradeData(loaded) {
+  ensureGoalNumbers(loaded);
+  for (const item of loaded.items) {
+    if (item.kind === "goal" && item.goalType === "Maintain") {
+      item.frequency ??= DEFAULT_FREQUENCY;
+      item.checkIns ??= [];
+    }
+  }
+  return loaded;
+}
+
+/* ---------- Streaks ---------- */
+
+// Numbers each calendar period, so consecutive periods are consecutive numbers.
+// Weeks start on Monday. Fortnights are fixed two-week blocks starting on a Monday.
+function periodIndex(date, frequency) {
+  const [year, month, day] = date.split("-").map(Number);
+  const dayNumber = Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+  const daysSinceMonday = dayNumber - 4; // 1970-01-05 was a Monday.
+  switch (frequency) {
+    case "daily": return dayNumber;
+    case "weekly": return Math.floor(daysSinceMonday / 7);
+    case "fortnightly": return Math.floor(daysSinceMonday / 14);
+    case "monthly": return year * 12 + (month - 1);
+    case "quarterly": return year * 4 + Math.floor((month - 1) / 3);
+    default: return year;
+  }
+}
+
+// The current period doesn't break a streak until it's over, so an unchecked
+// "this week" still counts the weeks before it.
+function streakInfo(goal, onDate = today()) {
+  const periods = new Set(goal.checkIns.map((date) => periodIndex(date, goal.frequency)));
+  const now = periodIndex(onDate, goal.frequency);
+  const doneNow = periods.has(now);
+  let current = 0;
+  for (let period = doneNow ? now : now - 1; periods.has(period); period--) current++;
+  let best = 0;
+  let run = 0;
+  let previous = null;
+  for (const period of [...periods].sort((a, b) => a - b)) {
+    run = previous !== null && period === previous + 1 ? run + 1 : 1;
+    best = Math.max(best, run);
+    previous = period;
+  }
+  return { current, best, doneNow };
+}
+
+// Checks in for the current period, or undoes that check-in if there already is one.
+function toggleCheckIn(goal) {
+  const now = periodIndex(today(), goal.frequency);
+  const inThisPeriod = (date) => periodIndex(date, goal.frequency) === now;
+  goal.checkIns = goal.checkIns.some(inThisPeriod)
+    ? goal.checkIns.filter((date) => !inThisPeriod(date))
+    : [...goal.checkIns, today()].sort();
+  ui.returnFocusKey = `checkin-${goal.id}`;
+  commit();
 }
 
 function isOptionalDate(value) {
@@ -83,6 +154,13 @@ function validate(data) {
     if (item.archived !== undefined && (item.kind !== "goal" || typeof item.archived !== "boolean")) {
       fail("invalid archived state");
     }
+    if (item.frequency !== undefined && (item.kind !== "goal" || !Object.hasOwn(FREQUENCIES, item.frequency))) {
+      fail("invalid repeat setting");
+    }
+    if (item.checkIns !== undefined && (item.kind !== "goal" || !Array.isArray(item.checkIns)
+      || item.checkIns.some((date) => typeof date !== "string" || !DATE_PATTERN.test(date)))) {
+      fail("invalid check-ins");
+    }
     if (item.kind === "goal") {
       if (item.parentId !== null) fail("goal with a parent");
       if (!GOAL_TYPES.includes(item.goalType)) fail("unknown goal type");
@@ -109,7 +187,7 @@ function loadData() {
   try {
     raw = localStorage.getItem(STORAGE_KEY);
     if (raw === null) return emptyData();
-    return ensureGoalNumbers(validate(JSON.parse(raw)));
+    return upgradeData(validate(JSON.parse(raw)));
   } catch (error) {
     // Keep unreadable data under another key so a later save can't destroy it.
     try {
@@ -178,11 +256,15 @@ function commit() {
   render();
 }
 
-function addItem(kind, parentId, title, goalType) {
+function addItem(kind, parentId, title, goalType, frequency) {
   const item = { id: newId(), kind, parentId, title, done: false };
   if (kind === "goal") {
     item.goalType = goalType;
     item.goalNumber = data.nextGoalNumber++;
+    if (goalType === "Maintain") {
+      item.frequency = frequency || DEFAULT_FREQUENCY;
+      item.checkIns = [];
+    }
   }
   data.items.push(item);
   commit();
@@ -209,7 +291,7 @@ function exportData() {
 
 async function readImportFile(file) {
   try {
-    ui.pendingImport = ensureGoalNumbers(validate(JSON.parse(await file.text())));
+    ui.pendingImport = upgradeData(validate(JSON.parse(await file.text())));
     ui.notice = null;
   } catch (error) {
     ui.pendingImport = null;
@@ -390,6 +472,10 @@ function renderItem(item, isTopLevel) {
   const attached = isArchived ? [] : data.achievements.filter((achievement) => achievement.attachedTo === item.id);
   const children = isArchived ? [] : childrenOf(item.id);
   const classes = ["item", item.kind, isTopLevel ? "card" : "", item.done ? "is-done" : "", isArchived ? "archived" : ""];
+  // Only active Maintenance goals take check-ins. Finished or archived ones just show their type.
+  const repeats = item.kind === "goal" && item.goalType === "Maintain" ? FREQUENCIES[item.frequency] : null;
+  const tracksStreak = repeats && !item.done && !isArchived;
+  const streak = tracksStreak ? streakInfo(item) : null;
 
   const line = h(
     "div",
@@ -408,8 +494,28 @@ function renderItem(item, isTopLevel) {
       : null,
     item.kind === "goal" ? h("span", { class: "goal-id" }, goalId(item)) : null,
     h("span", { class: "title" }, item.title),
-    item.kind === "goal" ? h("span", { class: "tag" }, GOAL_TYPE_LABELS[item.goalType]) : null,
+    item.kind === "goal"
+      ? h("span", { class: "tag" }, repeats ? `${GOAL_TYPE_LABELS.Maintain} · ${repeats.label}` : GOAL_TYPE_LABELS[item.goalType])
+      : null,
     item.kind === "goal" && item.done ? h("span", { class: "tag" }, "Finished") : null,
+    streak && streak.current
+      ? h("span", {
+          class: "tag streak",
+          title: `Best: ${streak.best} ${repeats.unit}${streak.best === 1 ? "" : "s"}`,
+        }, `${streak.current}-${repeats.unit} streak`)
+      : null,
+    tracksStreak
+      ? h("button", {
+          type: "button",
+          class: "checkin",
+          key: `checkin-${item.id}`,
+          "aria-pressed": String(streak.doneNow),
+          "aria-label": streak.doneNow
+            ? `Undo check-in for ${repeats.period}: ${item.title}`
+            : `Check in for ${repeats.period}: ${item.title}`,
+          onclick: () => toggleCheckIn(item),
+        }, streak.doneNow ? `✓ Done ${repeats.period}` : "Check in")
+      : null,
     openBlockers
       ? h("span", {
           class: "blocker-count",
@@ -527,6 +633,22 @@ function modalField(label, control) {
   return h("label", { class: "field" }, h("span", {}, label), control);
 }
 
+// "Repeats" only applies to Maintenance goals, so it shows and hides with the Type field.
+function repeatsField(typeSelect, formKey, current) {
+  const select = draftField(
+    h("select", {}, Object.entries(FREQUENCIES).map(([value, frequency]) => (
+      h("option", { value, selected: value === current }, frequency.label)
+    ))),
+    `${formKey}:repeats`,
+    current,
+  );
+  const field = modalField("Repeats", select);
+  const sync = () => { field.hidden = typeSelect.value !== "Maintain"; };
+  typeSelect.addEventListener("change", sync);
+  sync();
+  return { select, field };
+}
+
 function modalDialog({ heading, error, close, onSubmit, fields, footer }) {
   return h(
     "dialog",
@@ -573,6 +695,7 @@ function renderAddModal() {
   const typeSelect = kind === "goal"
     ? draftField(goalTypeSelect("Achieve"), `${formKey}:type`, "Achieve")
     : null;
+  const repeats = typeSelect ? repeatsField(typeSelect, formKey, DEFAULT_FREQUENCY) : null;
   const hasDate = kind === "achievement" || kind === "reminder";
   const dateInput = hasDate
     ? draftField(h("input", { type: "date" }), `${formKey}:date`, kind === "achievement" ? today() : "")
@@ -602,6 +725,7 @@ function renderAddModal() {
       if (!title) return showError("Type a title first.", titleInput);
       if (kind === "achievement" && !dateInput.value) return showError("Choose a date.", dateInput);
       const typeValue = typeSelect ? typeSelect.value : undefined;
+      const repeatsValue = repeats ? repeats.select.value : undefined;
       const dateValue = dateInput ? dateInput.value : "";
       const attachValue = attachSelect ? attachSelect.value : "";
       close();
@@ -612,13 +736,14 @@ function renderAddModal() {
         data.reminders.push({ id: newId(), title, date: dateValue || null, done: false });
         commit();
       } else {
-        addItem(kind, parentId, title, typeValue);
+        addItem(kind, parentId, title, typeValue, repeatsValue);
       }
     },
     fields: [
       parent && kind !== "achievement" ? h("p", { class: "meta modal-context" }, `Under ${pathOf(parent)}`) : null,
       modalField("Title", titleInput),
       typeSelect ? modalField("Type", typeSelect) : null,
+      repeats ? repeats.field : null,
       dateInput ? modalField(kind === "reminder" ? "Date (optional)" : "Date", dateInput) : null,
       attachSelect ? modalField("Attached to", attachSelect) : null,
     ],
@@ -651,6 +776,7 @@ function renderEditModal() {
   const typeSelect = item && item.kind === "goal"
     ? draftField(goalTypeSelect(item.goalType), `${formKey}:type`, item.goalType)
     : null;
+  const repeats = typeSelect ? repeatsField(typeSelect, formKey, item.frequency || DEFAULT_FREQUENCY) : null;
   const dateInput = achievement || reminder
     ? draftField(h("input", { type: "date" }), `${formKey}:date`, record.date || "")
     : null;
@@ -730,6 +856,11 @@ function renderEditModal() {
       if (achievement && !dateInput.value) return showError("Choose a date.", dateInput);
       record.title = title;
       if (typeSelect) record.goalType = typeSelect.value;
+      if (typeSelect && record.goalType === "Maintain") {
+        // Check-ins are kept even if the repeat setting changes, and the streak is recounted.
+        record.frequency = repeats.select.value;
+        record.checkIns ??= [];
+      }
       if (achievement) {
         record.date = dateInput.value;
         record.attachedTo = attachSelect.value || null;
@@ -741,6 +872,7 @@ function renderEditModal() {
     fields: [
       modalField("Title", titleInput),
       typeSelect ? modalField("Type", typeSelect) : null,
+      repeats ? repeats.field : null,
       dateInput ? modalField(reminder ? "Date (optional)" : "Date", dateInput) : null,
       attachSelect ? modalField("Attached to", attachSelect) : null,
     ],
