@@ -303,6 +303,23 @@ button.more[aria-expanded="true"] { border-color: var(--line); color: var(--text
 }
 .tag.alert { background: var(--blocker-bg); border-color: transparent; color: var(--blocker); }
 .archived > .line .title { color: var(--muted); text-decoration: none; }
+
+/* Maintenance goals: streak tag and the check-in button. */
+.tag.streak { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+button.checkin {
+  padding: 2px 12px;
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-pill);
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+button.checkin[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
 .archive-toggle {
   display: flex;
   align-items: center;
@@ -378,6 +395,7 @@ button.more[aria-expanded="true"] { border-color: var(--line); color: var(--text
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field span { color: var(--muted); font-size: 0.85rem; }
 .field input, .field select { width: 100%; }
+.field[hidden] { display: none; }
 .modal-context { margin: -8px 0 0; overflow-wrap: anywhere; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 .modal-actions[hidden] { display: none; }

@@ -12,6 +12,7 @@ Versions stay on `0.x` while this is a proof of concept:
 
 - Added: Goals with a permanent ID and a type, plus blockers, tasks and subtasks.
 - Added: Finishing, reopening and archiving goals.
+- Added: Maintenance goals repeat on a schedule, with check-ins and streaks.
 - Added: Achievements, attached to any goal item or left unattached.
 - Added: Reminders as a list, with no notifications.
 - Added: Open blockers shown as a visible flag, with no auto-pausing.

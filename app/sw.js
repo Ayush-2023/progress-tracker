@@ -1,6 +1,6 @@
 // Offline support. Files always come from the network when it's available, so
 // updates show straight away. The saved copies are only used when offline.
-const CACHE = "progress-tracker-v3";
+const CACHE = "progress-tracker-v4";
 const APP_FILES = [
   "./",
   "index.html",
